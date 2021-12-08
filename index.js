@@ -1,7 +1,50 @@
 class Promise2 {
     static pending = 'pending';
     static fulfilled = 'fulfilled';
-    static rejected = 'rejected';
+    static _rejected = 'rejected';
+    static resolve(value) {
+        // 判断是否是thenable对象
+        if (value instanceof Promise2 || ((typeof value === 'object') && 'then' in value)) {
+            return value;
+        }
+
+        return new Promise2((resolve) => resolve(value));
+    }
+
+    static rejected(value) {
+        // 判断是否是thenable对象
+        if (value instanceof Promise2 || ((typeof value === 'object') && 'then' in value)) {
+            return value;
+        }
+
+        return new Promise2( (resolve,reject) => reject(value));
+    }
+    static all(iterable) {
+        return new Promise2((resolve, reject) => {
+            const ret = [];
+            let count = 0;
+
+            Array.from(iterable).forEach((item, index) => {
+                Promise2.resolve(item).then(data => {
+                    ret[index] = data;
+                    count++;
+
+                    if (count === iterable.length) {
+                        resolve(ret);
+                    }
+                }, reject);
+            });
+        });
+    }
+
+    static race(iterable) {
+        return new Promise2((resolve, reject) => {
+            Array.from(iterable).forEach(item => {
+                Promise2.resolve(item).then(resolve, reject);
+            });
+        });
+    }
+
     constructor(executor) {
         this.status = Promise2.pending; // 初始化状态为pending
         this.value = undefined; // 存储 this._resolve 即操作成功 返回的值
@@ -24,7 +67,13 @@ class Promise2 {
             });
         });
     }
+    catch(onRejected) {
+        return this.then(null, onRejected);
+    }
 
+    finally(onFinally) {
+        return this.then(onFinally, onFinally);
+    }
     _resolve(result) {
         if (result instanceof Promise2) {
             result.then(
@@ -47,7 +96,7 @@ class Promise2 {
             return;
         }
         this.reason = reason;
-        this.status = Promise2.rejected; // 将状态设置为失败
+        this.status = Promise2._rejected; // 将状态设置为失败
         this.callbacks.forEach((cb) => this._handler(cb));
     }
     _handler(callback) {
@@ -58,48 +107,30 @@ class Promise2 {
         }
 
 
-        if (this.status === Promise2.fulfilled && onFulfilled) {
+        if (this.status === Promise2.fulfilled) {
             // 传入存储的值
             // 未传入onFulfilled时，将undefined传入
-            const nextValue = onFulfilled ? onFulfilled(this.value) : undefined;
+            const nextValue = onFulfilled ? onFulfilled(this.value) : this.value;
             nextResolve(nextValue);
-            return;
-
         }
 
-        if (this.status === Promise2.rejected && onRejected) {
+        if (this.status === Promise2._rejected ) {
             // 传入存储的错误信息
             // 同样的处理
-            const nextReason = onRejected ? onRejected(this.reason) : undefined;
+            const nextReason = onRejected ? onRejected(this.reason) : this.reason;
             nextReject(nextReason);
         }
     }
-
 }
 
 
-const a = new Promise2((resolve, reject)=>{
-    console.log('00')
-    setTimeout(()=>{resolve('resolve-result-2')}, 2000)
-});
 
 
-a.then(() => {
-    console.log('resolve-2')
-    return 77
-}).then((data)=>{
-    console.log('resolve-3')
-    return new Promise2(resolve => {
-        setTimeout(() => {
-            resolve(data + ' wei');
-        }, 5000);
-    });
-}).then(result => {
-    console.log('result-4')
-    console.log(result)
-});
 
 
+Promise2.rejected(33).then(res => {
+    console.log(res)
+})
 
 
 
